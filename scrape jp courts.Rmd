@@ -1,0 +1,138 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r setup}
+library(rvest)
+library(stringi)
+library(tidyverse)
+library(V8)
+```
+
+
+
+Below code is based on the procedure here: https://gist.github.com/flovv/91453712e8a6ba957e63#file-scrape_final-js 
+
+The starting URL is the first page of search results, which must be manually grabbed from a browser. That is, submit the search form in a browser manually, going through the list of election-related codes. Set the correct dates and other factors. Take the resulting url and enter it below. The rest should be automated.
+
+First page of results:
+Next step: break the URL up into segments: prefex, lawchunkinfo, etc. Lawchunkinfo gets changed for each search, and is obtained manually from the website.
+
+
+Note that collection was only done for laws with > 10 court cases
+
+```{r}
+https://sudact.ru/magistrate/doc/?magistrate-txt=&magistrate-case_doc=&magistrate-lawchunkinfo=%D0%A1%D1%82%D0%B0%D1%82%D1%8C%D1%8F+5.6.+%D0%9D%D0%B0%D1%80%D1%83%D1%88%D0%B5%D0%BD%D0%B8%D0%B5+%D0%BF%D1%80%D0%B0%D0%B2+%D1%87%D0%BB%D0%B5%D0%BD%D0%B0+%D0%B8%D0%B7%D0%B1%D0%B8%D1%80%D0%B0%D1%82%D0%B5%D0%BB%D1%8C%D0%BD%D0%BE%D0%B9+%D0%BA%D0%BE%D0%BC%D0%B8%D1%81%D1%81%D0%B8%D0%B8%2C+%D0%BA%D0%BE%D0%BC%D0%B8%D1%81%D1%81%D0%B8%D0%B8+%D1%80%D0%B5%D1%84%D0%B5%D1%80%D0%B5%D0%BD%D0%B4%D1%83%D0%BC%D0%B0%2C+%D0%BD%D0%B0%D0%B1%D0%BB%D1%8E%D0%B4%D0%B0%D1%82%D0%B5%D0%BB%D1%8F%2C+%D0%B8%D0%BD%D0%BE%D1%81%D1%82%D1%80%D0%B0%D0%BD%D0%BD%D0%BE%D0%B3%D0%BE+%28%D0%BC%D0%B5%D0%B6%D0%B4%D1%83%D0%BD%D0%B0%D1%80%D0%BE%D0%B4%D0%BD%D0%BE%D0%B3%D0%BE%29+%D0%BD%D0%B0%D0%B1%D0%BB%D1%8E%D0%B4%D0%B0%D1%82%D0%B5%D0%BB%D1%8F%2C+%D0%B4%D0%BE%D0%B2%D0%B5%D1%80%D0%B5%D0%BD%D0%BD%D0%BE%D0%B3%D0%BE+%D0%BB%D0%B8%D1%86%D0%B0+%D0%B8%D0%BB%D0%B8+%D1%83%D0%BF%D0%BE%D0%BB%D0%BD%D0%BE%D0%BC%D0%BE%D1%87%D0%B5%D0%BD%D0%BD%D0%BE%D0%B3%D0%BE+%D0%BF%D1%80%D0%B5%D0%B4%D1%81%D1%82%D0%B0%D0%B2%D0%B8%D1%82%D0%B5%D0%BB%D1%8F+%D0%BA%D0%B0%D0%BD%D0%B4%D0%B8%D0%B4%D0%B0%D1%82%D0%B0%2C+%D0%B8%D0%B7%D0%B1%D0%B8%D1%80%D0%B0%D1%82%D0%B5%D0%BB%D1%8C%D0%BD%D0%BE%D0%B3%D0%BE+%D0%BE%D0%B1%D1%8A%D0%B5%D0%B4%D0%B8%D0%BD%D0%B5%D0%BD%D0%B8%D1%8F%2C+%D1%87%D0%BB%D0%B5%D0%BD%D0%B0+%D0%B8%D0%BB%D0%B8+%D1%83%D0%BF%D0%BE%D0%BB%D0%BD%D0%BE%D0%BC%D0%BE%D1%87%D0%B5%D0%BD%D0%BD%D0%BE%D0%B3%D0%BE+%D0%BF%D1%80%D0%B5%D0%B4%D1%81%D1%82%D0%B0%D0%B2%D0%B8%D1%82%D0%B5%D0%BB%D1%8F+%D0%B8%D0%BD%D0%B8%D1%86%D0%B8%D0%B0%D1%82%D0%B8%D0%B2%D0%BD%D0%BE%D0%B9+%D0%B3%D1%80%D1%83%D0%BF%D0%BF%D1%8B+%D0%BF%D0%BE+%D0%BF%D1%80%D0%BE%D0%B2%D0%B5%D0%B4%D0%B5%D0%BD%D0%B8%D1%8E+%D1%80%D0%B5%D1%84%D0%B5%D1%80%D0%B5%D0%BD%D0%B4%D1%83%D0%BC%D0%B0%2C+%D0%B8%D0%BD%D0%BE%D0%B9+%D0%B3%D1%80%D1%83%D0%BF%D0%BF%D1%8B+%D1%83%D1%87%D0%B0%D1%81%D1%82%D0%BD%D0%B8%D0%BA%D0%BE%D0%B2+%D1%80%D0%B5%D1%84%D0%B5%D1%80%D0%B5%D0%BD%D0%B4%D1%83%D0%BC%D0%B0+%D0%BB%D0%B8%D0%B1%D0%BE+%D0%BF%D1%80%D0%B5%D0%B4%D1%81%D1%82%D0%B0%D0%B2%D0%B8%D1%82%D0%B5%D0%BB%D1%8F+%D1%81%D1%80%D0%B5%D0%B4%D1%81%D1%82%D0%B2%D0%B0+%D0%BC%D0%B0%D1%81%D1%81%D0%BE%D0%B2%D0%BE%D0%B9+%D0%B8%D0%BD%D1%84%D0%BE%D1%80%D0%BC%D0%B0%D1%86%D0%B8%D0%B8%28%D0%9A%D0%9E%D0%90%D0%9F%29&magistrate-date_from=01.01.2000&magistrate-date_to=&magistrate-area=&magistrate-court=&magistrate-judge=#searchResult
+```
+
+
+```{r url structure}
+prefix.page1 <- "https://sudact.ru/magistrate/doc/?magistrate-txt=&magistrate-case_doc=&magistrate-"
+
+lawchunk <- "lawchunkinfo=%D0%A1%D1%82%D0%B0%D1%82%D1%8C%D1%8F+5.6.+%D0%9D%D0%B0%D1%80%D1%83%D1%88%D0%B5%D0%BD%D0%B8%D0%B5+%D0%BF%D1%80%D0%B0%D0%B2+%D1%87%D0%BB%D0%B5%D0%BD%D0%B0+%D0%B8%D0%B7%D0%B1%D0%B8%D1%80%D0%B0%D1%82%D0%B5%D0%BB%D1%8C%D0%BD%D0%BE%D0%B9+%D0%BA%D0%BE%D0%BC%D0%B8%D1%81%D1%81%D0%B8%D0%B8%2C+%D0%BA%D0%BE%D0%BC%D0%B8%D1%81%D1%81%D0%B8%D0%B8+%D1%80%D0%B5%D1%84%D0%B5%D1%80%D0%B5%D0%BD%D0%B4%D1%83%D0%BC%D0%B0%2C+%D0%BD%D0%B0%D0%B1%D0%BB%D1%8E%D0%B4%D0%B0%D1%82%D0%B5%D0%BB%D1%8F%2C+%D0%B8%D0%BD%D0%BE%D1%81%D1%82%D1%80%D0%B0%D0%BD%D0%BD%D0%BE%D0%B3%D0%BE+%28%D0%BC%D0%B5%D0%B6%D0%B4%D1%83%D0%BD%D0%B0%D1%80%D0%BE%D0%B4%D0%BD%D0%BE%D0%B3%D0%BE%29+%D0%BD%D0%B0%D0%B1%D0%BB%D1%8E%D0%B4%D0%B0%D1%82%D0%B5%D0%BB%D1%8F%2C+%D0%B4%D0%BE%D0%B2%D0%B5%D1%80%D0%B5%D0%BD%D0%BD%D0%BE%D0%B3%D0%BE+%D0%BB%D0%B8%D1%86%D0%B0+%D0%B8%D0%BB%D0%B8+%D1%83%D0%BF%D0%BE%D0%BB%D0%BD%D0%BE%D0%BC%D0%BE%D1%87%D0%B5%D0%BD%D0%BD%D0%BE%D0%B3%D0%BE+%D0%BF%D1%80%D0%B5%D0%B4%D1%81%D1%82%D0%B0%D0%B2%D0%B8%D1%82%D0%B5%D0%BB%D1%8F+%D0%BA%D0%B0%D0%BD%D0%B4%D0%B8%D0%B4%D0%B0%D1%82%D0%B0%2C+%D0%B8%D0%B7%D0%B1%D0%B8%D1%80%D0%B0%D1%82%D0%B5%D0%BB%D1%8C%D0%BD%D0%BE%D0%B3%D0%BE+%D0%BE%D0%B1%D1%8A%D0%B5%D0%B4%D0%B8%D0%BD%D0%B5%D0%BD%D0%B8%D1%8F%2C+%D1%87%D0%BB%D0%B5%D0%BD%D0%B0+%D0%B8%D0%BB%D0%B8+%D1%83%D0%BF%D0%BE%D0%BB%D0%BD%D0%BE%D0%BC%D0%BE%D1%87%D0%B5%D0%BD%D0%BD%D0%BE%D0%B3%D0%BE+%D0%BF%D1%80%D0%B5%D0%B4%D1%81%D1%82%D0%B0%D0%B2%D0%B8%D1%82%D0%B5%D0%BB%D1%8F+%D0%B8%D0%BD%D0%B8%D1%86%D0%B8%D0%B0%D1%82%D0%B8%D0%B2%D0%BD%D0%BE%D0%B9+%D0%B3%D1%80%D1%83%D0%BF%D0%BF%D1%8B+%D0%BF%D0%BE+%D0%BF%D1%80%D0%BE%D0%B2%D0%B5%D0%B4%D0%B5%D0%BD%D0%B8%D1%8E+%D1%80%D0%B5%D1%84%D0%B5%D1%80%D0%B5%D0%BD%D0%B4%D1%83%D0%BC%D0%B0%2C+%D0%B8%D0%BD%D0%BE%D0%B9+%D0%B3%D1%80%D1%83%D0%BF%D0%BF%D1%8B+%D1%83%D1%87%D0%B0%D1%81%D1%82%D0%BD%D0%B8%D0%BA%D0%BE%D0%B2+%D1%80%D0%B5%D1%84%D0%B5%D1%80%D0%B5%D0%BD%D0%B4%D1%83%D0%BC%D0%B0+%D0%BB%D0%B8%D0%B1%D0%BE+%D0%BF%D1%80%D0%B5%D0%B4%D1%81%D1%82%D0%B0%D0%B2%D0%B8%D1%82%D0%B5%D0%BB%D1%8F+%D1%81%D1%80%D0%B5%D0%B4%D1%81%D1%82%D0%B2%D0%B0+%D0%BC%D0%B0%D1%81%D1%81%D0%BE%D0%B2%D0%BE%D0%B9+%D0%B8%D0%BD%D1%84%D0%BE%D1%80%D0%BC%D0%B0%D1%86%D0%B8%D0%B8%28%D0%9A%D0%9E%D0%90%D0%9F%29&" #This is replaced manually each time
+
+suffix <- "magistrate-date_from=01.01.2000&magistrate-date_to=&magistrate-area=&magistrate-court=&magistrate-judge=#searchResult"
+```
+
+
+
+```{r}
+url <- paste0(prefix.page1, lawchunk, suffix)
+  lines <- readLines("scrape_final.js")
+  lines[1] <- paste0("var url ='", url ,"';")
+  lines[12] <- "fs.write('1.html', page.content, 'w');"
+
+  writeLines(lines, "scrape_final.js")
+system("phantomjs scrape_final.js")
+
+
+results <- read_html("1.html", encoding = "utf-8")
+
+#other.pages.1.urls <- results %>% html_nodes("ul.pager") %>% html_nodes("li") %>% html_nodes("a") %>% html_attr("href")
+
+#length.pager <- length(other.pages.1.urls)
+#url2 <- paste0("https://sudact.ru/regular/doc/", other.pages.1.urls[length.pager])
+
+#lines <- readLines("scrape_final.js")
+#lines[1] <- paste0("var url ='", url2 ,"';")
+#lines[12] <- "fs.write('pager.html', page.content, 'w');"
+#writeLines(lines, "scrape_final.js")
+#system("phantomjs scrape_final.js")
+#results.pager <- read_html("pager.html", encoding = "utf-8")
+
+#other.pages.2.urls <- results.pager %>% html_nodes("ul.pager") %>% html_nodes("li") %>% html_nodes("a") %>% html_attr("href") #This process goes to the farthest page in the javascript, step by step. I'm not sure if there's a better way to do this automatically, since html_session can't navigate the js. Best solution may be to manually get the relevant starting url, as well as the relevant max page.
+
+
+```
+
+Subsequent pages of results:
+
+```{r}
+for(j in 44:47){  #Set this manually, as one less than the max page number
+ prefix.pagen <- paste0("https://sudact.ru/magistrate/doc/?page=", j+1, "&magistrate-case_doc=&magistrate-date_from=01.01.2000&magistrate-area=&magistrate-judge=&magistrate-date_to=&magistrate-txt=&magistrate-")
+
+  url <- paste0(prefix.pagen, lawchunk) #Set this URL manually as well
+  lines <- readLines("scrape_final.js")
+  lines[1] <- paste0("var url ='", url ,"';")
+  lines[12] <- paste0("fs.write('", j+1, ".html', page.content, 'w');")
+  writeLines(lines, "scrape_final2.js")
+system("phantomjs scrape_final2.js")
+
+results <- read_html(paste0(j+1, ".html"), encoding = "utf-8")
+urls <- results  %>% html_nodes("ul.results") %>% html_nodes("li") %>% html_nodes("h4") %>% html_nodes("a") %>% html_attr("href")
+
+if(length(urls) == 0) {
+  print("Error: CAPTCHA needed")
+  break
+}
+else{
+print(paste("Page", j+1, "complete. Switching to next page."))
+ Sys.sleep(sample(8:15, 1))
+ }
+}
+
+```
+
+First page decisions
+```{r}
+case.data <- matrix(NA, ncol = 2, nrow = 1)
+case.data.temp <- case.data
+
+for(j in 45:48){ #Update this number manually with max for each search
+html.file <- paste0(j, ".html")
+results <- read_html(html.file, encoding = "utf-8")
+
+url_stems <- results  %>% html_nodes(".results a") %>% html_attr("href")
+urls <- paste0("https://sudact.ru", url_stems)
+case.info <- results  %>% html_nodes(".results a") %>% html_text
+case.info <- stri_trans_general(case.info, 'latin')
+
+
+session <- html_session("https://sudact.ru")
+
+i <- 1
+for(i in 1:length(urls)){
+  url.new <- urls[i]
+  session <- session %>% jump_to(url.new)
+
+  decision <- session  %>% html_nodes(".h-col1-inner3") %>% html_text()
+  decision.latin <- stri_trans_general(decision, 'latin')
+  #decision.latin <- gsub("\\{[^\\]]*\\}", "", decision.latin, perl=TRUE) #Removes text between curly braces
+  #decision.latin <- gsub("\\[[^\\]]*\\]", "", decision.latin, perl=TRUE) #Removes text between square brackets
+
+  case.data.temp[,1] <- case.info[i]
+  case.data.temp[,2] <- decision.latin
+  case.data <- rbind(case.data, case.data.temp)
+  print(paste("Item", i, "of", length(urls), "complete.", sep=" "))
+ Sys.sleep(sample(30:45, 1))
+  session <- session %>% back()
+}
+print(paste("Page", j, "complete. Switching to next page."))
+}
+
+write.csv(case.data, "article-5.6-cases-jp.csv")
+```
+
+
+
