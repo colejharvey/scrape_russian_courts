@@ -1,0 +1,48 @@
+---
+title: "Pre-processing for machine translation"
+output: html_notebook
+---
+
+This script uses spacyr to split a decision text into sentences. This is necessary because the machine translation program can only handle sentence-sized translation tasks.
+
+The next step will be to iterate this over the full set of decisions, and save the json files to a cloud storage setting.
+
+These can then be accessed on the office desktop so that it can plug away on translations.
+
+```{r}
+library(jsonlite)
+library(tidyverse)
+library(spacyr)
+spacy_download_langmodel("ru_core_news_md")
+spacy_initialize(model = "ru_core_news_md")
+
+
+data_full <- readRDS(here::here("Data", "combined_dataset_cyr.RDS"))
+
+```
+
+```{r}
+sentence_list <- spacy_tokenize(x = data_full$decision.text[2], what = "sentence", output = "list")
+```
+
+```{r}
+list_max <- length(sentence_list$text1)
+for(i in list_max:2){
+  if(nchar(sentence_list$text1[i]) <= 30) {
+    sentence_list$text1[i-1] <- paste(sentence_list$text1[i-1], sentence_list$text1[i])
+    sentence_list$text1[i] <- NA
+    }
+}
+```
+
+```{r}
+sentence_list$text1 <- sentence_list$text1[!is.na(sentence_list$text1)]
+write_json(sentence_list, here::here("Data", "Text_lists", "test.json"))
+
+```
+
+
+```{r}
+spacy_finalize()
+```
+

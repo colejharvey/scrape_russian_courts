@@ -1,0 +1,212 @@
+---
+title: "Data cleaning"
+output: html_notebook
+---
+
+```{r setup}
+library(tidyverse)
+library(stringr)
+library(stringi)
+library(pals) #Color palletes
+```
+
+
+```{r}
+##Get the list of files
+filepath <- here::here("Relevant cases", "Backup for Russian court cases")
+myfiles <- list.files(path=filepath, pattern="*.RDS", full.names=TRUE)
+
+##Get list of filenames for lawcode
+filenames <- myfiles %>% str_sub(., start = 112, end = -5)
+
+
+
+##Loop to create lawcode column for each dataset
+
+for(i in 1:length(myfiles)){
+  current_file <- read_rds(myfiles[i])
+  current_file <-current_file %>% mutate(lawcode = str_extract_all(filenames[i],"\\(?[0-9,.]+\\)?")[[1]][1])
+    #Check for jp vs regular
+  jp.status <- str_detect(string = filenames[i], pattern = "jp")
+  current_file <- current_file %>% mutate(court_type = ifelse(jp.status == TRUE, "jp", "regular"))
+  
+
+
+##Getting dates
+## Create day, month, and year columns
+
+current_file <- current_file %>% mutate(day = NA)
+current_file <- current_file %>% mutate(month = NA)
+current_file <- current_file %>% mutate(year = NA)
+
+## Get date information
+  for(j in 1:nrow(current_file)){
+    date.string <- str_extract(current_file$case.info[j], "ot.*g\\.") #Period indicates any character; * means any number of times.
+    date <- str_sub(date.string, 4, -4) 
+    date.split <- str_split_fixed(date, " ", n =3)
+    current_file$day[j] <- as.numeric(date.split[1])
+    current_file$month[j] <- date.split[2]
+    current_file$year[j] <- as.numeric(date.split[3])
+
+  }  #End of internal loop
+write_rds(x = current_file, file = myfiles[i])
+} #End of whole loop
+
+
+
+```
+
+
+Trying to remove problem strings
+
+```{r}
+for(i in 1:length(myfiles)){
+  current_file <- read_rds(myfiles[i])
+  for(j in 1:nrow(current_file)){
+    decision.text2 <- current_file$decision.text[j]
+    #First remove newlines
+    decision.text2 <- str_replace_all(decision.text2, "[\r\n]", "")
+    #Remove curly braces and brackets
+    decision.text2 <- str_replace_all(decision.text2, "\\{", "")
+    decision.text2 <- str_replace_all(decision.text2, "\\}", "")
+    decision.text2 <- str_replace_all(decision.text2, "\\[", "")
+    decision.text2 <- str_replace_all(decision.text2, "\\]", "")
+    #Now remove problem text
+    #str_view_all(decision.text2, "window.*?isAutoReloads: false") #For visualizing matches / debugging
+
+    decision.text2 <- str_replace_all(decision.text2, "window.*?harn", "")
+    decision.text2 <- str_replace_all(decision.text2, "window.*?isAutoReloads: false", "")
+    
+    #Replace old text with clean text
+    current_file$decision.text[j] <- decision.text2
+  } #Close inner loop
+  #Save file with clean text
+write_rds(x = current_file, file = myfiles[i])
+
+    
+} #Close outer loop
+
+```
+
+
+Combining all into one big dataset
+
+```{r}
+filepath <- here::here("Relevant cases", "Backup for Russian court cases")
+myfiles <- list.files(path=filepath, pattern="*.RDS", full.names=TRUE)
+
+combined.dataset <- read_rds(myfiles[1])
+
+for(i in 2:length(myfiles)){
+  current_file <- read_rds(myfiles[i])
+  combined.dataset <- bind_rows(combined.dataset, current_file)
+}
+
+write_rds(x = combined.dataset, file = here::here("Data", "combined_dataset.RDS"))
+
+```
+
+Testing with a plot
+
+```{r}
+yearly_cases <- combined.dataset %>% group_by(year, lawcode) %>% summarize(sum_cases = n())
+cust.pallete <-as.vector(pals::kelly())
+
+
+ggplot(data = yearly_cases %>% filter(year >= 2010), aes(x = year, y = sum_cases, color = lawcode)) +
+  geom_line() +
+  scale_colour_manual(values=cust.pallete) +
+  theme_bw()
+
+
+ggplot(data = yearly_cases %>% filter(year >= 2010 & lawcode != 5.12), aes(x = year, y = sum_cases, color = lawcode)) +
+  geom_line() +
+    scale_colour_manual(values=cust.pallete) +
+  theme_bw()
+
+
+```
+
+Breaking out regular vs jp
+
+```{r}
+combined.dataset.reg <- combined.dataset %>% filter(court_type == "regular")
+combined.dataset.jp <- combined.dataset %>% filter(court_type == "jp")
+
+
+yearly_cases_reg <- combined.dataset.reg %>% group_by(year, lawcode) %>% summarize(sum_cases = n())
+yearly_cases_jp <- combined.dataset.jp %>% group_by(year, lawcode) %>% summarize(sum_cases = n())
+
+```
+
+
+```{r}
+ggplot(data = yearly_cases_reg %>% filter(year >= 2010), aes(x = year, y = sum_cases, color = lawcode)) +
+  geom_line() +
+    scale_colour_manual(values=cust.pallete) +
+  theme_bw()
+
+## Criminal code only
+ggplot(data = yearly_cases_reg %>% filter(lawcode == 141 | lawcode == 142 | lawcode == 142.1), aes(x = year, y = sum_cases, color = lawcode)) +
+  geom_line()  +
+  theme_bw()
+
+```
+
+```{r}
+ggplot(data = yearly_cases_jp %>% filter(year >= 2010), aes(x = year, y = sum_cases, color = lawcode)) +
+  geom_line() +
+  theme_bw()
+
+# No 5.12
+ggplot(data = yearly_cases_jp %>% filter(year >= 2010 & lawcode != 5.12), aes(x = year, y = sum_cases, color = lawcode)) +
+  geom_line() +
+  theme_bw()
+```
+
+```{r}
+data <- read_rds(here::here("Data", "combined_dataset.RDS"))
+#data <- data %>% mutate(decision.text = str_squish(decision.text))  #Removes excess white-space
+sum(nchar(data$decision.text), na.rm=T)
+
+##Save a cyrillic version
+data.cyr <- data %>% mutate(decision.text = stri_trans_general(decision.text, 'cyrillic'))
+write_rds(x = data.cyr, file = here::here("Data", "combined_dataset_cyr.RDS"))
+
+##A version without dates
+data.subset <- data %>% select(decision.text, case.info, lawcode, court_type)
+#openxlsx::write.xlsx(data.subset, here::here("Data", "combined_dataset.xlsx"))
+write.csv(data.subset, here::here("Data", "combined_dataset.csv"))
+```
+
+```{r}
+##Back to Cyrillic and saving as a Stata file in order to read into QDA miner lite
+data.subset.cyr <- data %>% select(decision.text, case.info, lawcode, court_type)
+data.subset.cyr <- data.subset.cyr %>% rename(decision_text = decision.text)
+data.subset.cyr <- data.subset.cyr %>% rename(case_info = case.info)
+
+data.subset.cyr <- data.subset.cyr %>% mutate(decision_text = stri_trans_general(decision_text, 'cyrillic'))
+data.subset.cyr <- data.subset.cyr %>% filter(is.na(decision_text)==F)
+haven::write_dta(data.subset.cyr, here::here("Data", "combined_dataset_cyrillic_stata.dta"))
+haven::write_sav(data.subset.cyr[2:50,], here::here("Data", "combined_dataset_cyrillic_spss.sav"))
+#openxlsx::write.xlsx(data.subset.cyr, here::here("Data", "combined_dataset_cyr.xlsx"))
+#MESS::write.xml(data.subset.cyr, here::here("Data", "combined_dataset_cyr.xml"), collapse = T)
+```
+
+NOTE: Looks like translation will need to come first---too many complications with using the cyrillic text
+
+```{r}
+data <- data %>% mutate(defendant = NA)
+data <- data %>% mutate(violation.found = NA)
+data <- data %>% mutate(penalty = NA) #Code as categorical: Fine, jail, results annulled, none
+data <- data %>% mutate(fine.amount = NA)
+data <- data %>% mutate(jail.amount = NA)
+data <- data %>% mutate(suspended.sentence = NA)
+
+
+
+
+```
+
+
+
