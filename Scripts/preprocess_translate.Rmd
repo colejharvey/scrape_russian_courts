@@ -13,7 +13,7 @@ These can then be accessed on the office desktop so that it can plug away on tra
 library(jsonlite)
 library(tidyverse)
 library(spacyr)
-spacy_download_langmodel("ru_core_news_md")
+#spacy_download_langmodel("ru_core_news_md") #Only needed once
 spacy_initialize(model = "ru_core_news_md")
 
 
@@ -22,18 +22,31 @@ data_full <- readRDS(here::here("Data", "combined_dataset_cyr.RDS"))
 ```
 
 ```{r}
-sentence_list <- spacy_tokenize(x = data_full$decision.text[2], what = "sentence", output = "list")
+## Steps:
+  ## Break each case into sentences
+  ## Join small fragments to sentences
+  ## Remove NAs
+  ## Save
+
+for(i in 7001:nrow(data_full)){
+  if(is.na(data_full$decision.text[i])==TRUE) next
+  
+  sentence_list <- spacy_tokenize(x = data_full$decision.text[i], what = "sentence", output = "list")
+  list_max <- length(sentence_list$text1)
+    for(j in list_max:2){
+      if(nchar(sentence_list$text1[j]) <= 30) {
+      sentence_list$text1[j-1] <- paste(sentence_list$text1[j-1], sentence_list$text1[j])
+      sentence_list$text1[j] <- NA
+    }
+    }
+  sentence_list$text1 <- sentence_list$text1[!is.na(sentence_list$text1)]
+  filename <- paste0("caseid", "_", data_full$caseid[i], ".json")
+  write_json(sentence_list, here::here("Data", "Text_lists", filename))
+}
+
 ```
 
-```{r}
-list_max <- length(sentence_list$text1)
-for(i in list_max:2){
-  if(nchar(sentence_list$text1[i]) <= 30) {
-    sentence_list$text1[i-1] <- paste(sentence_list$text1[i-1], sentence_list$text1[i])
-    sentence_list$text1[i] <- NA
-    }
-}
-```
+
 
 ```{r}
 sentence_list$text1 <- sentence_list$text1[!is.na(sentence_list$text1)]
